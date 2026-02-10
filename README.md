@@ -530,6 +530,36 @@ assert '>Click me</button>' in str(result)
 This explicit approach makes it clear where data comes from and avoids the
 "magic" of implicit context passing.
 
+### Context
+
+`tdom` provides a `Context` mechanism (built on `contextvars`) to share data
+deeply through the component tree without prop drilling.
+
+```python
+from tdom import create_context, html
+
+# Create a context object
+ThemeContext = create_context("theme", default="light")
+
+def ThemedButton(text: str):
+    # Read the current context value
+    theme = ThemeContext.get()
+    return html(t"<button class='btn-{theme}'>{text}</button>")
+
+def App():
+    # Provide a value for the context
+    with ThemeContext.provide("dark"):
+        return html(t"<{ThemedButton} text='Click Me' />")
+
+# result = html(t"<{App} />")
+# <button class='btn-dark'>Click Me</button>
+```
+
+**Note**: Context works by setting a variable for the duration of the `with`
+block. Because `tdom` resolves children *before* passing them to a parent
+component, you cannot use a "Provider Component" pattern to wrap children passed
+as props. You must use the `with` statement in the parent's body.
+
 ### Async Components
 
 `tdom` supports asynchronous components using `html_async`. This allows you to
