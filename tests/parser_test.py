@@ -1,8 +1,8 @@
 import pytest
 
-from .parser import TemplateParser
-from .placeholders import TemplateRef
-from .tnodes import (
+from tdom.parser import TemplateParser
+from tdom.placeholders import TemplateRef
+from tdom.tnodes import (
     TComment,
     TComponent,
     TDocumentType,

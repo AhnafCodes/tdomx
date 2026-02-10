@@ -1,7 +1,7 @@
 import pytest
 from markupsafe import Markup
 
-from .nodes import Comment, DocumentType, Element, Fragment, Text
+from tdom.nodes import Comment, DocumentType, Element, Fragment, Text
 
 
 def test_comment():

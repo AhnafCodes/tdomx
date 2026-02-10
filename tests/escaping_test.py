@@ -1,4 +1,4 @@
-from .escaping import escape_html_comment, escape_html_script, escape_html_style
+from tdom.escaping import escape_html_comment, escape_html_script, escape_html_style
 
 
 def test_escape_html_comment_empty() -> None:

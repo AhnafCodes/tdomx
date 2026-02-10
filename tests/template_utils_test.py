@@ -2,7 +2,7 @@ from string.templatelib import Interpolation
 
 import pytest
 
-from .template_utils import TemplateRef, template_from_parts, combine_template_refs
+from tdom.template_utils import TemplateRef, template_from_parts, combine_template_refs
 
 
 def test_template_from_parts() -> None:

@@ -7,9 +7,9 @@ from itertools import product
 import pytest
 from markupsafe import Markup
 
-from .nodes import Comment, DocumentType, Element, Fragment, Node, Text
-from .placeholders import make_placeholder_config
-from .processor import html
+from tdom.nodes import Comment, DocumentType, Element, Fragment, Node, Text
+from tdom.placeholders import make_placeholder_config
+from tdom.processor import html
 
 # --------------------------------------------------------------------------
 # Basic HTML parsing tests
@@ -402,6 +402,28 @@ def test_list_items():
         ],
     )
     assert str(node) == "<ul><li>Apple</li><li>Banana</li><li>Cherry</li></ul>"
+
+
+def test_generator_items():
+    items = ["Apple", "Banana", "Cherry"]
+    node = html(t"<ul>{(t'<li>{item}</li>' for item in items)}</ul>")
+    assert node == Element(
+        "ul",
+        children=[
+            Element("li", children=[Text("Apple")]),
+            Element("li", children=[Text("Banana")]),
+            Element("li", children=[Text("Cherry")]),
+        ],
+    )
+    assert str(node) == "<ul><li>Apple</li><li>Banana</li><li>Cherry</li></ul>"
+
+
+def test_generator_items_matches_list_items():
+    items = ["Apple", "Banana", "Cherry"]
+    list_node = html(t"<ul>{[t'<li>{item}</li>' for item in items]}</ul>")
+    gen_node = html(t"<ul>{(t'<li>{item}</li>' for item in items)}</ul>")
+    assert list_node == gen_node
+    assert str(list_node) == str(gen_node)
 
 
 def test_nested_list_items():
