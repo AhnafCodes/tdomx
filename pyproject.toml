@@ -41,6 +41,7 @@ dev = [
   "myst-parser>=4.0.1",
   "pyright>=1.1.407",
   "pytest>=9.0.2",
+  "pytest-asyncio>=0.23.5",
   "pytest-cov>=7.0.0",
   "pytest-html>=4.1.1",
   "pytest-watcher>=0.4.3",
@@ -51,8 +52,9 @@ dev = [
 ]
 
 [tool.pytest]
-testpaths = ["tdom", "docs", "README.md"]
+testpaths = ["tests", "docs", "README.md"]
 python_files = ["*_test.py"]
+asyncio_mode = "auto"
 
 [tool.pyright]
 include = ["tdom"]

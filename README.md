@@ -246,6 +246,20 @@ fruit_list = html(t"<ul>{[t'<li>{fruit}</li>' for fruit in fruits]}</ul>")
 # <ul><li>Apple</li><li>Banana</li><li>Cherry</li></ul>
 ```
 
+### Generator Expressions
+
+Generator expressions work the same as list comprehensions but avoid allocating an
+intermediate list — items are produced one at a time and immediately consumed:
+
+```python
+fruits = ["Apple", "Banana", "Cherry"]
+fruit_list = html(t"<ul>{(t'<li>{fruit}</li>' for fruit in fruits)}</ul>")
+assert str(fruit_list) == "<ul><li>Apple</li><li>Banana</li><li>Cherry</li></ul>"
+```
+
+Any iterable (lists, tuples, generators, etc.) in a child content position is
+expanded into a `Fragment`, so choose whichever form reads best for your use case.
+
 ### Raw HTML Injection
 
 The `tdom` package provides several ways to include trusted raw HTML content in
@@ -515,6 +529,51 @@ assert '>Click me</button>' in str(result)
 
 This explicit approach makes it clear where data comes from and avoids the
 "magic" of implicit context passing.
+
+### Async Components
+
+`tdom` supports asynchronous components using `html_async`. This allows you to
+fetch data or perform other I/O operations directly within your components.
+
+```python
+import asyncio
+from tdom import html_async
+
+async def UserProfile(user_id: int):
+    # Simulate fetching data
+    await asyncio.sleep(0.1)
+    return t"<div class='profile'>User {user_id}</div>"
+
+async def main():
+    # You must await html_async
+    result = await html_async(t"<{UserProfile} user_id={123} />")
+    print(result)
+
+# asyncio.run(main())
+# <div class='profile'>User 123</div>
+```
+
+Async components are executed in parallel where possible.
+
+### Streaming Rendering
+
+For large responses, you can stream the HTML output chunk by chunk using
+`html_stream` (sync) or `html_stream_async` (async). This is useful for keeping
+memory usage low when generating large documents.
+
+```python
+from tdom import html_stream
+
+template = t"<ul>{[t'<li>{i}</li>' for i in range(1000)]}</ul>"
+
+for chunk in html_stream(template):
+    # Send chunk to client...
+    print(chunk, end="")
+```
+
+Note that `html_stream_async` is currently "buffered streaming," meaning it
+waits for the entire component tree to resolve (including async data fetches)
+before yielding the first chunk.
 
 ### The `tdom` Module
 
