@@ -44,7 +44,7 @@ class HasHTMLDunder(t.Protocol):
 
 
 @lru_cache(maxsize=0 if "pytest" in sys.modules else 512)
-def _parse_and_cache(cachable: CachableTemplate) -> TNode:
+def parse_and_cache(cachable: CachableTemplate) -> TNode:
     return TemplateParser.parse(cachable.template)
 
 
@@ -284,7 +284,7 @@ ATTR_ACCUMULATOR_MAKERS = {
 type AttributeValueAccumulator = StyleAccumulator | ClassAccumulator
 
 
-def _resolve_t_attrs(
+def resolve_t_attrs(
     attrs: t.Sequence[TAttribute], interpolations: tuple[Interpolation, ...]
 ) -> AttributesDict:
     """
@@ -320,7 +320,7 @@ def _resolve_t_attrs(
                 else:
                     new_attrs[name] = attr_value
             case TTemplatedAttribute(name=name, value_ref=ref):
-                attr_t = _resolve_ref(ref, interpolations)
+                attr_t = resolve_ref(ref, interpolations)
                 attr_value = format_template(attr_t)
                 if name in ATTR_ACCUMULATOR_MAKERS:
                     if name not in attr_accs:
@@ -368,7 +368,7 @@ def _resolve_html_attrs(attrs: AttributesDict) -> HTMLAttributesDict:
     return html_attrs
 
 
-def _resolve_attrs(
+def resolve_attrs(
     attrs: t.Sequence[TAttribute], interpolations: tuple[Interpolation, ...]
 ) -> HTMLAttributesDict:
     """
@@ -376,11 +376,11 @@ def _resolve_attrs(
 
     This is the full pipeline: interpolation + HTML processing.
     """
-    interpolated_attrs = _resolve_t_attrs(attrs, interpolations)
+    interpolated_attrs = resolve_t_attrs(attrs, interpolations)
     return _resolve_html_attrs(interpolated_attrs)
 
 
-def _flatten_nodes(nodes: t.Iterable[Node]) -> list[Node]:
+def flatten_nodes(nodes: t.Iterable[Node]) -> list[Node]:
     """Flatten a list of Nodes, expanding any Fragments."""
     flat: list[Node] = []
     for node in nodes:
@@ -396,7 +396,7 @@ def _substitute_and_flatten_children(
 ) -> list[Node]:
     """Substitute placeholders in a list of children and flatten any fragments."""
     resolved = [_resolve_t_node(child, interpolations) for child in children]
-    flat = _flatten_nodes(resolved)
+    flat = flatten_nodes(resolved)
     return flat
 
 
@@ -432,7 +432,7 @@ def _node_from_value(value: object) -> Node:
             return Text(str(value))
 
 
-def _kebab_to_snake(name: str) -> str:
+def kebab_to_snake(name: str) -> str:
     """Convert a kebab-case name to snake_case."""
     return name.replace("-", "_").lower()
 
@@ -477,6 +477,11 @@ def _invoke_component(
         )
     callable_info = get_callable_info(value)
 
+    if callable_info.is_async:
+        raise TypeError(
+            f"Async component {value.__name__} cannot be used in synchronous html(). Use html_async() instead."
+        )
+
     if callable_info.requires_positional:
         raise TypeError(
             "Component callables cannot have required positional arguments."
@@ -486,7 +491,7 @@ def _invoke_component(
 
     # Add all supported attributes
     for attr_name, attr_value in attrs.items():
-        snake_name = _kebab_to_snake(attr_name)
+        snake_name = kebab_to_snake(attr_name)
         if snake_name in callable_info.named_params or callable_info.kwargs:
             kwargs[snake_name] = attr_value
 
@@ -505,7 +510,7 @@ def _invoke_component(
     return _node_from_value(result)
 
 
-def _resolve_ref(
+def resolve_ref(
     ref: TemplateRef, interpolations: tuple[Interpolation, ...]
 ) -> Template:
     resolved = [interpolations[i_index] for i_index in ref.i_indexes]
@@ -523,9 +528,9 @@ def _resolve_t_text_ref(
         Text(part)
         if isinstance(part, str)
         else _node_from_value(format_interpolation(part))
-        for part in _resolve_ref(ref, interpolations)
+        for part in resolve_ref(ref, interpolations)
     ]
-    flat = _flatten_nodes(parts)
+    flat = flatten_nodes(parts)
 
     if len(flat) == 1 and isinstance(flat[0], Text):
         return flat[0]
@@ -539,7 +544,7 @@ def _resolve_t_node(t_node: TNode, interpolations: tuple[Interpolation, ...]) ->
         case TText(ref=ref):
             return _resolve_t_text_ref(ref, interpolations)
         case TComment(ref=ref):
-            comment_t = _resolve_ref(ref, interpolations)
+            comment_t = resolve_ref(ref, interpolations)
             comment = format_template(comment_t)
             return Comment(comment)
         case TDocumentType(text=text):
@@ -550,7 +555,7 @@ def _resolve_t_node(t_node: TNode, interpolations: tuple[Interpolation, ...]) ->
             )
             return Fragment(children=resolved_children)
         case TElement(tag=tag, attrs=attrs, children=children):
-            resolved_attrs = _resolve_attrs(attrs, interpolations)
+            resolved_attrs = resolve_attrs(attrs, interpolations)
             resolved_children = _substitute_and_flatten_children(
                 children, interpolations
             )
@@ -565,7 +570,7 @@ def _resolve_t_node(t_node: TNode, interpolations: tuple[Interpolation, ...]) ->
             end_interpolation = (
                 None if end_i_index is None else interpolations[end_i_index]
             )
-            resolved_attrs = _resolve_t_attrs(t_attrs, interpolations)
+            resolved_attrs = resolve_t_attrs(t_attrs, interpolations)
             resolved_children = _substitute_and_flatten_children(
                 children, interpolations
             )
@@ -593,5 +598,11 @@ def _resolve_t_node(t_node: TNode, interpolations: tuple[Interpolation, ...]) ->
 def html(template: Template) -> Node:
     """Parse an HTML t-string, substitute values, and return a tree of Nodes."""
     cachable = CachableTemplate(template)
-    t_node = _parse_and_cache(cachable)
+    t_node = parse_and_cache(cachable)
     return _resolve_t_node(t_node, template.interpolations)
+
+
+def html_stream(template: Template) -> t.Iterator[str]:
+    """Parse an HTML t-string and stream the output chunks."""
+    node = html(template)
+    yield from node.render_chunks()
