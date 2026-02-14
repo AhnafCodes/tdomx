@@ -202,3 +202,104 @@ labels = ["first", "second", "third"]
 result = html(t"<h1>{title}</h1><{TodoList} labels={labels} />")
 assert str(result) == '<h1>My Todos</h1><ul><li>first</li><li>second</li><li>third</li></ul>'
 ```
+
+## A Realistic Card Component
+
+The previous examples are intentionally simple. Let's build a more realistic
+`Card` component with a header (image + title) and a content section, similar
+to what you'd see in a real application:
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class Card:
+    title: str
+    img_url: str
+    children: Iterable[Node] = ()
+
+    def __call__(self) -> Node:
+        return html(t"""
+            <div class="card">
+                <div class="card_header">
+                    <img src={self.img_url} />
+                    <h1>{self.title}</h1>
+                </div>
+                <div class="card_content">
+                    {self.children}
+                </div>
+            </div>
+        """)
+
+
+result = html(t"""
+    <{Card} title="My Card" img_url="/static/images/hero.png">
+        <p>This is the card body content.</p>
+    </{Card}>
+""")
+assert '<div class="card">' in str(result)
+assert '<img src="/static/images/hero.png" />' in str(result)
+assert '<h1>My Card</h1>' in str(result)
+assert '<p>This is the card body content.</p>' in str(result)
+```
+
+You can also use it with dynamic values and build a list of cards:
+
+```python
+@dataclass
+class CardList:
+    cards: list[dict]
+
+    def __call__(self) -> Node:
+        return html(t"""
+            <div class="card-grid">
+                {[
+                    html(t'''
+                        <{Card} title={card["title"]} img_url={card["img_url"]}>
+                            <p>{card["description"]}</p>
+                        </{Card}>
+                    ''')
+                    for card in self.cards
+                ]}
+            </div>
+        """)
+
+
+cards_data = [
+    {"title": "First", "img_url": "/static/img/1.png", "description": "First card"},
+    {"title": "Second", "img_url": "/static/img/2.png", "description": "Second card"},
+]
+result = html(t"<{CardList} cards={cards_data} />")
+assert str(result).count('<div class="card">') == 2
+```
+
+## Function vs Class Components
+
+While class-based components are powerful, function components are often simpler and less verbose for most use cases. Here is the same `Card` component implemented as a function:
+
+```python
+def Card(title: str, img_url: str, children: Iterable[Node] = ()) -> Node:
+    return html(t"""
+        <div class="card">
+            <div class="card_header">
+                <img src={img_url} />
+                <h1>{title}</h1>
+            </div>
+            <div class="card_content">
+                {children}
+            </div>
+        </div>
+    """)
+```
+
+This eliminates the dataclass boilerplate entirely and is the idiomatic way to write components in `tdom`.
+
+
+In a Flask application, you would generate the image URL dynamically:
+
+```python
+# In a Flask view:
+# img_url = url_for('static', filename='images/hero.png')
+# result = html(t'<{Card} title="Welcome" img_url={img_url}>...</{Card}>')
+```

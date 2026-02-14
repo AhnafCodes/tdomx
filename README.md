@@ -459,6 +459,27 @@ requests children, it will receive them if provided. If no children are
 provided, the value of children is an empty tuple. If the component does _not_
 ask for children, but they are provided, then they are silently ignored.
 
+#### Function vs Class Components
+
+While class-based components are powerful, function components are often simpler and less verbose for most use cases. Here is the same `Card` component implemented as a function:
+
+```python
+def Card(title: str, img_url: str, children: Iterable[Node] = ()) -> Node:
+    return html(t"""
+        <div class="card">
+            <div class="card_header">
+                <img src={img_url} />
+                <h1>{title}</h1>
+            </div>
+            <div class="card_content">
+                {children}
+            </div>
+        </div>
+    """)
+```
+
+This eliminates the dataclass boilerplate entirely and is the idiomatic way to write components in `tdom`.
+
 #### SVG Support
 
 SVG elements work seamlessly with `tdom` since they follow the same XML-like
