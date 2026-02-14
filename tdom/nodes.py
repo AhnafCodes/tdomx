@@ -184,9 +184,13 @@ class Text(Node):
 
 @dataclass(slots=True)
 class Fragment(Node):
-    children: Sequence[Node] = field(default_factory=list)
+    children: Sequence[Node] = ()
 
-    @override
+    def __post_init__(self):
+        # Ensure children are always an immutable tuple internally
+        if not isinstance(self.children, tuple):
+            self.children = tuple(self.children)
+
     def __str__(self) -> str:
         return "".join(str(child) for child in self.children)
 
@@ -226,7 +230,7 @@ class DocumentType(Node):
 class Element(Node):
     tag: str
     attrs: dict[str, str | None] = field(default_factory=dict)
-    children: Sequence[Node] = field(default_factory=list)
+    children: Sequence[Node] = ()
 
     def __post_init__(self):
         """Ensure all preconditions are met."""
@@ -236,6 +240,9 @@ class Element(Node):
         # Void elements cannot have children
         if self.is_void and self.children:
             raise ValueError(f"Void element <{self.tag}> cannot have children.")
+
+        if not isinstance(self.children, tuple):
+            self.children = tuple(self.children)
 
     @property
     def is_void(self) -> bool:
