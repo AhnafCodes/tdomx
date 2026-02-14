@@ -87,6 +87,7 @@ class TemplateParser(HTMLParser):
     stack: list[OpenTag]
     placeholders: PlaceholderState
     source: SourceTracker | None
+    _svg_depth: int = 0
 
     def __init__(self, *, convert_charrefs: bool = True):
         # This calls HTMLParser.reset() which we override to set up our state.
@@ -108,15 +109,15 @@ class TemplateParser(HTMLParser):
     # Attribute Helpers
     # ------------------------------------------
 
-    def make_tattr(self, attr: HTMLAttribute) -> TAttribute:
+    def make_tattr(
+        self, attr: HTMLAttribute, svg_context: bool = False
+    ) -> TAttribute:
         """Build a TAttribute from a raw attribute tuple."""
 
         name, value = attr
-        
-        # Fix case for SVG attributes
-        if name in SVG_CASE_FIX:
-            name = SVG_CASE_FIX[name]
-            
+        if svg_context:
+            name = SVG_CASE_FIX.get(name, name)
+
         name_ref = self.placeholders.remove_placeholders(name)
         value_ref = (
             self.placeholders.remove_placeholders(value) if value is not None else None
@@ -141,25 +142,26 @@ class TemplateParser(HTMLParser):
             )
         return TSpreadAttribute(i_index=name_ref.i_indexes[0])
 
-    def make_tattrs(self, attrs: t.Sequence[HTMLAttribute]) -> tuple[TAttribute, ...]:
+    def make_tattrs(
+        self, attrs: t.Sequence[HTMLAttribute], svg_context: bool = False
+    ) -> tuple[TAttribute, ...]:
         """Build TAttributes from raw attribute tuples."""
-        return tuple(self.make_tattr(attr) for attr in attrs)
+        return tuple(self.make_tattr(attr, svg_context) for attr in attrs)
 
     # ------------------------------------------
     # Tag Helpers
     # ------------------------------------------
 
-    def make_open_tag(self, tag: str, attrs: t.Sequence[HTMLAttribute]) -> OpenTag:
+    def make_open_tag(
+        self, tag: str, attrs: t.Sequence[HTMLAttribute], svg_context: bool = False
+    ) -> OpenTag:
         """Build an OpenTag from a raw tag and attribute tuples."""
-        
-        # Fix case for SVG tags
-        if tag in SVG_TAG_FIX:
-            tag = SVG_TAG_FIX[tag]
-            
         tag_ref = self.placeholders.remove_placeholders(tag)
 
         if tag_ref.is_literal:
-            return OpenTElement(tag=tag, attrs=self.make_tattrs(attrs))
+            return OpenTElement(
+                tag=tag, attrs=self.make_tattrs(attrs, svg_context)
+            )
 
         if not tag_ref.is_singleton:
             raise ValueError(
@@ -172,7 +174,7 @@ class TemplateParser(HTMLParser):
         i_index = tag_ref.i_indexes[0]
         return OpenTComponent(
             start_i_index=i_index,
-            attrs=self.make_tattrs(attrs),
+            attrs=self.make_tattrs(attrs, svg_context),
         )
 
     def finalize_tag(
@@ -199,11 +201,6 @@ class TemplateParser(HTMLParser):
     def validate_end_tag(self, tag: str, open_tag: OpenTag) -> int | None:
         """Validate that closing tag matches open tag. Return component end index if applicable."""
         assert self.source, "Parser source tracker not initialized."
-        
-        # Fix case for SVG tags
-        if tag in SVG_TAG_FIX:
-            tag = SVG_TAG_FIX[tag]
-
         tag_ref = self.placeholders.remove_placeholders(tag)
 
         match open_tag:
@@ -240,7 +237,13 @@ class TemplateParser(HTMLParser):
     # ------------------------------------------
 
     def handle_starttag(self, tag: str, attrs: t.Sequence[HTMLAttribute]) -> None:
-        open_tag = self.make_open_tag(tag, attrs)
+        if tag == "svg":
+            self._svg_depth += 1
+
+        if self._svg_depth > 0:
+            tag = SVG_TAG_FIX.get(tag, tag)
+
+        open_tag = self.make_open_tag(tag, attrs, svg_context=(self._svg_depth > 0))
         if isinstance(open_tag, OpenTElement) and open_tag.tag in VOID_ELEMENTS:
             final_tag = self.finalize_tag(open_tag)
             self.append_child(final_tag)
@@ -249,13 +252,25 @@ class TemplateParser(HTMLParser):
 
     def handle_startendtag(self, tag: str, attrs: t.Sequence[HTMLAttribute]) -> None:
         """Dispatch a self-closing tag, `<tag />` to specialized handlers."""
-        open_tag = self.make_open_tag(tag, attrs)
+        is_svg_tag = tag == "svg"
+        effective_svg_context = (self._svg_depth > 0) or is_svg_tag
+
+        if effective_svg_context:
+            tag = SVG_TAG_FIX.get(tag, tag)
+
+        open_tag = self.make_open_tag(tag, attrs, svg_context=effective_svg_context)
         final_tag = self.finalize_tag(open_tag)
         self.append_child(final_tag)
 
     def handle_endtag(self, tag: str) -> None:
         if not self.stack:
             raise ValueError(f"Unexpected closing tag </{tag}> with no open tag.")
+
+        if self._svg_depth > 0:
+            tag = SVG_TAG_FIX.get(tag, tag)
+
+        if tag == "svg":
+            self._svg_depth -= 1
 
         open_tag = self.stack.pop()
         endtag_i_index = self.validate_end_tag(tag, open_tag)
@@ -300,6 +315,7 @@ class TemplateParser(HTMLParser):
         self.stack = []
         self.placeholders = PlaceholderState()
         self.source = None
+        self._svg_depth = 0
 
     def close(self) -> None:
         if self.stack:

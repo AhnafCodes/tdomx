@@ -465,3 +465,64 @@ def test_adjacent_end_component_tag_error():
 
     with pytest.raises(ValueError):
         _ = TemplateParser.parse(t"<{Component}></{Component}{Component}>")
+
+
+#
+# SVG Context
+#
+def test_svg_attributes_outside_svg_context():
+    # 'tableValues' is in SVG_CASE_FIX.
+    # HTMLParser lowercases attributes, so we get 'tablevalues'.
+    # Outside SVG, it should remain 'tablevalues'.
+    node = TemplateParser.parse(t'<div tableValues="1"></div>')
+    assert node == TElement(
+        "div",
+        attrs=(TLiteralAttribute("tablevalues", "1"),),
+        children=(),
+    )
+
+
+def test_svg_attributes_inside_svg_context():
+    # Inside SVG, 'tablevalues' should be mapped back to 'tableValues'.
+    node = TemplateParser.parse(t'<svg><path tableValues="1"></path></svg>')
+    assert node == TElement(
+        "svg",
+        attrs=(),
+        children=(
+            TElement(
+                "path",
+                attrs=(TLiteralAttribute("tableValues", "1"),),
+                children=(),
+            ),
+        ),
+    )
+
+
+def test_svg_tags_outside_svg_context():
+    # 'linearGradient' is in SVG_TAG_FIX.
+    # HTMLParser lowercases tags.
+    # Outside SVG, it should remain 'lineargradient'.
+    node = TemplateParser.parse(t'<linearGradient></linearGradient>')
+    assert node == TElement("lineargradient", children=())
+
+
+def test_svg_tags_inside_svg_context():
+    # Inside SVG, 'lineargradient' should be mapped back to 'linearGradient'.
+    node = TemplateParser.parse(t'<svg><linearGradient></linearGradient></svg>')
+    assert node == TElement(
+        "svg",
+        children=(TElement("linearGradient", children=()),),
+    )
+
+
+def test_self_closing_svg_tag():
+    # <svg /> should have its attributes processed in svg_context.
+    # viewBox is case sensitive.
+    # HTMLParser gives viewbox.
+    # It should be mapped to viewBox.
+    node = TemplateParser.parse(t'<svg viewBox="0 0 10 10" />')
+    assert node == TElement(
+        "svg",
+        attrs=(TLiteralAttribute("viewBox", "0 0 10 10"),),
+        children=(),
+    )
