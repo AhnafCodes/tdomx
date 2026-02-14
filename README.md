@@ -21,13 +21,13 @@ You'll need [Python 3.14](https://www.python.org/downloads/release/python-3140/)
 Then, just run:
 
 ```bash
-pip install tdom
+pip install tdomx
 ```
 
 If you have [Astral's `uv`](https://docs.astral.sh/uv/) you can easily try `tdom` in an isolated Python 3.14 environment:
 
 ```bash
-uv run --with tdom --python 3.14 python
+uv run --with tdomx --python 3.14 python
 ```
 
 ## Usage
