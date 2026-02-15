@@ -1,5 +1,5 @@
 from markupsafe import Markup, escape
-
+from .context import create_context
 from .nodes import Comment, DocumentType, Element, Fragment, Node, Text
 from .processor import html
 
