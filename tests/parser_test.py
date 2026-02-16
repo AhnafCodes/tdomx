@@ -509,3 +509,145 @@ def test_parse_non_svg_context():
     # clipPath outside svg should be lowercase (or whatever HTMLParser does, which is lowercase)
     node = TemplateParser.parse(t"<clipPath></clipPath>")
     assert node == TElement("clippath")
+
+
+# SVG_TAG_FIX: tags get camelCase only inside <svg>
+def test_svg_tag_fix_applied_inside_svg():
+    """Various SVG tags should be case-fixed inside an SVG context."""
+    node = TemplateParser.parse(
+        t"<svg>"
+        t"<foreignObject></foreignObject>"
+        t"<linearGradient></linearGradient>"
+        t"<radialGradient></radialGradient>"
+        t"<textPath></textPath>"
+        t"<animateTransform></animateTransform>"
+        t"</svg>"
+    )
+    assert node == TElement(
+        "svg",
+        children=(
+            TElement("foreignObject"),
+            TElement("linearGradient"),
+            TElement("radialGradient"),
+            TElement("textPath"),
+            TElement("animateTransform"),
+        ),
+    )
+
+
+def test_svg_tag_fix_not_applied_outside_svg():
+    """Outside SVG context, tags remain lowercase (as HTMLParser lowercases them)."""
+    node = TemplateParser.parse(t"<foreignObject></foreignObject>")
+    assert node == TElement("foreignobject")
+
+    node = TemplateParser.parse(t"<linearGradient></linearGradient>")
+    assert node == TElement("lineargradient")
+
+    node = TemplateParser.parse(t"<feGaussianBlur></feGaussianBlur>")
+    assert node == TElement("fegaussianblur")
+
+
+def test_svg_tag_fix_self_closing_inside_svg():
+    """Self-closing SVG tags should also get case-fixed."""
+    node = TemplateParser.parse(t"<svg><feMergeNode /></svg>")
+    assert node == TElement(
+        "svg",
+        children=(TElement("feMergeNode"),),
+    )
+
+
+def test_svg_tag_fix_self_closing_outside_svg():
+    """Self-closing tags outside SVG remain lowercase."""
+    node = TemplateParser.parse(t"<feMergeNode />")
+    assert node == TElement("femergenode")
+
+
+# SVG_CASE_FIX: attributes get camelCase only inside <svg>
+def test_svg_case_fix_applied_inside_svg():
+    """Various SVG attributes should be case-fixed inside an SVG context."""
+    node = TemplateParser.parse(
+        t'<svg viewBox="0 0 10 10" preserveAspectRatio="xMidYMid">'
+        t'<filter filterUnits="userSpaceOnUse">'
+        t'<feGaussianBlur stdDeviation="5" />'
+        t"</filter>"
+        t"</svg>"
+    )
+    assert node == TElement(
+        "svg",
+        attrs=(
+            TLiteralAttribute("viewBox", "0 0 10 10"),
+            TLiteralAttribute("preserveAspectRatio", "xMidYMid"),
+        ),
+        children=(
+            TElement(
+                "filter",
+                attrs=(TLiteralAttribute("filterUnits", "userSpaceOnUse"),),
+                children=(
+                    TElement(
+                        "feGaussianBlur",
+                        attrs=(TLiteralAttribute("stdDeviation", "5"),),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
+def test_svg_case_fix_not_applied_outside_svg():
+    """Outside SVG context, attributes remain lowercase."""
+    node = TemplateParser.parse(t'<div viewBox="0 0 10 10"></div>')
+    assert node == TElement(
+        "div",
+        attrs=(TLiteralAttribute("viewbox", "0 0 10 10"),),
+    )
+
+    node = TemplateParser.parse(
+        t'<div preserveAspectRatio="xMidYMid"></div>'
+    )
+    assert node == TElement(
+        "div",
+        attrs=(TLiteralAttribute("preserveaspectratio", "xMidYMid"),),
+    )
+
+
+def test_svg_case_fix_multiple_attributes():
+    """Multiple SVG attributes on a single element get case-fixed."""
+    node = TemplateParser.parse(
+        t'<svg><animateTransform attributeName="transform" repeatCount="indefinite" '
+        t'keyTimes="0;1" keySplines="0.5 0 0.5 1" /></svg>'
+    )
+    assert node == TElement(
+        "svg",
+        children=(
+            TElement(
+                "animateTransform",
+                attrs=(
+                    TLiteralAttribute("attributeName", "transform"),
+                    TLiteralAttribute("repeatCount", "indefinite"),
+                    TLiteralAttribute("keyTimes", "0;1"),
+                    TLiteralAttribute("keySplines", "0.5 0 0.5 1"),
+                ),
+            ),
+        ),
+    )
+
+
+def test_svg_fixes_stop_after_svg_closes():
+    """After </svg>, tag and attribute fixing should no longer apply."""
+    node = TemplateParser.parse(
+        t"<div>"
+        t"<svg><clipPath /></svg>"
+        t'<div viewBox="test"><foreignObject></foreignObject></div>'
+        t"</div>"
+    )
+    assert node == TElement(
+        "div",
+        children=(
+            TElement("svg", children=(TElement("clipPath"),)),
+            TElement(
+                "div",
+                attrs=(TLiteralAttribute("viewbox", "test"),),
+                children=(TElement("foreignobject"),),
+            ),
+        ),
+    )

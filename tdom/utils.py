@@ -6,8 +6,10 @@ class LastUpdatedOrderedDict(OrderedDict):
     "Store items in the order the keys were last updated."
 
     def __setitem__(self, key, value):
+        existing = key in self
         super().__setitem__(key, value)
-        self.move_to_end(key)
+        if existing:
+            self.move_to_end(key)
 
 
 class CachableTemplate:

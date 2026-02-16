@@ -138,12 +138,89 @@ SVG_CASE_FIX = {
 # FUTURE: make nodes frozen (and have the parser work with mutable builders)
 
 
+def _serialize_into(node: "Node", parts: list[str]) -> None:
+    """Serialize a Node into a list of string parts (linear, non-recursive style).
+
+    Instead of each __str__ building intermediate strings that get concatenated
+    up the call stack, this writes directly into a shared parts list.
+    One join() at the end produces the final string.
+    """
+    match node:
+        case Text(text=text):
+            parts.append(escape_html_text(text))
+        case Fragment(children=children):
+            for child in children:
+                _serialize_into(child, parts)
+        case Comment(text=text):
+            parts.append("<!--")
+            parts.append(escape_html_comment(text))
+            parts.append("-->")
+        case DocumentType(text=text):
+            parts.append("<!DOCTYPE ")
+            parts.append(text)
+            parts.append(">")
+        case Element(tag=tag, attrs=attrs, children=children):
+            # Open tag
+            parts.append("<")
+            parts.append(tag)
+            # Attributes
+            for key, value in attrs.items():
+                if value is None:
+                    parts.append(" ")
+                    parts.append(key)
+                else:
+                    parts.append(' ')
+                    parts.append(key)
+                    parts.append('="')
+                    parts.append(escape_html_text(value))
+                    parts.append('"')
+            # Void elements: self-close
+            if tag in VOID_ELEMENTS:
+                parts.append(" />")
+                return
+            parts.append(">")
+            # Children with script/style bulk escaping
+            if children and tag in ("script", "style"):
+                chunks: list[str] = []
+                for child in children:
+                    if isinstance(child, Text):
+                        chunks.append(child.text)
+                    else:
+                        raise ValueError(
+                            "Cannot serialize non-text content inside a script tag."
+                        )
+                raw = "".join(chunks)
+                if tag == "script":
+                    parts.append(escape_html_script(raw))
+                else:
+                    parts.append(escape_html_style(raw))
+            else:
+                for child in children:
+                    _serialize_into(child, parts)
+            # Close tag
+            parts.append("</")
+            parts.append(tag)
+            parts.append(">")
+
+
+def serialize(node: "Node") -> str:
+    """Serialize a Node tree to an HTML string.
+
+    Uses linear list-accumulation instead of recursive string concatenation.
+    """
+    parts: list[str] = []
+    _serialize_into(node, parts)
+    return "".join(parts)
+
+
 @dataclass(slots=True)
 class Node:
     def __html__(self) -> str:
         """Return the HTML representation of the node."""
-        # By default, just return the string representation
-        return str(self)
+        return serialize(self)
+
+    def __str__(self) -> str:
+        return serialize(self)
 
 
 @dataclass(slots=True)
@@ -151,7 +228,6 @@ class Text(Node):
     text: str  # which may be markupsafe.Markup in practice.
 
     def __str__(self) -> str:
-        # Use markupsafe's escape to handle HTML escaping
         return escape_html_text(self.text)
 
     def __eq__(self, other: object) -> bool:
@@ -169,24 +245,15 @@ class Fragment(Node):
         if not isinstance(self.children, tuple):
             self.children = tuple(self.children)
 
-    def __str__(self) -> str:
-        return "".join(str(child) for child in self.children)
-
 
 @dataclass(slots=True)
 class Comment(Node):
     text: str
 
-    def __str__(self) -> str:
-        return f"<!--{escape_html_comment(self.text)}-->"
-
 
 @dataclass(slots=True)
 class DocumentType(Node):
     text: str = "html"
-
-    def __str__(self) -> str:
-        return f"<!DOCTYPE {self.text}>"
 
 
 @dataclass(slots=True)
@@ -214,39 +281,3 @@ class Element(Node):
     @property
     def is_content(self) -> bool:
         return self.tag in CONTENT_ELEMENTS
-
-    def _children_to_str(self):
-        if not self.children:
-            return ""
-        if self.tag in ("script", "style"):
-            chunks = []
-            for child in self.children:
-                if isinstance(child, Text):
-                    chunks.append(child.text)
-                else:
-                    raise ValueError(
-                        "Cannot serialize non-text content inside a script tag."
-                    )
-            raw_children_str = "".join(chunks)
-            if self.tag == "script":
-                return escape_html_script(raw_children_str)
-            elif self.tag == "style":
-                return escape_html_style(raw_children_str)
-            else:
-                raise ValueError("Unsupported tag for single-level bulk escaping.")
-        else:
-            return "".join(str(child) for child in self.children)
-
-    def __str__(self) -> str:
-        # We use markupsafe's escape to handle HTML escaping of attribute values
-        # which means it's possible to mark them as safe if needed.
-        attrs_str = "".join(
-            f" {key}" if value is None else f' {key}="{escape_html_text(value)}"'
-            for key, value in self.attrs.items()
-        )
-        if self.is_void:
-            return f"<{self.tag}{attrs_str} />"
-        if not self.children:
-            return f"<{self.tag}{attrs_str}></{self.tag}>"
-        children_str = self._children_to_str()
-        return f"<{self.tag}{attrs_str}>{children_str}</{self.tag}>"
