@@ -1,4 +1,5 @@
 from markupsafe import Markup, escape
+from .async_processor import html_async
 from .context import create_context
 from .nodes import Comment, DocumentType, Element, Fragment, Node, Text
 from .processor import html
@@ -12,6 +13,7 @@ __all__ = [
     "escape",
     "Fragment",
     "html",
+    "html_async",
     "Markup",
     "Node",
     "Text",
