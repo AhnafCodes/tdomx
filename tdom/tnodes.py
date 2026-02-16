@@ -70,14 +70,14 @@ class TDocumentType(TNode):
 
 @dataclass(slots=True, frozen=True)
 class TFragment(TNode):
-    children: tuple[TNode, ...] = field(default_factory=tuple)
+    children: tuple[TNode, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
 class TElement(TNode):
     tag: str
-    attrs: tuple[TAttribute, ...] = field(default_factory=tuple)
-    children: tuple[TNode, ...] = field(default_factory=tuple)
+    attrs: tuple[TAttribute, ...] = ()
+    children: tuple[TNode, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
@@ -90,8 +90,8 @@ class TComponent(TNode):
 
     # TODO: hold on to _s_indexes too, when we start to need them.
 
-    attrs: tuple[TAttribute, ...] = field(default_factory=tuple)
-    children: tuple[TNode, ...] = field(default_factory=tuple)
+    attrs: tuple[TAttribute, ...] = ()
+    children: tuple[TNode, ...] = ()
 
 
 type TTag = TElement | TComponent | TFragment
