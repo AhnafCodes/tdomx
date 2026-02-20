@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from string.templatelib import Interpolation, Template
 
-from .nodes import VOID_ELEMENTS, SVG_CASE_FIX, SVG_TAG_FIX
+from .nodes import VOID_ELEMENTS
 from .placeholders import PlaceholderState
 from .tnodes import (
     TAttribute,
@@ -24,6 +24,107 @@ from .template_utils import combine_template_refs
 
 type HTMLAttribute = tuple[str, str | None]
 type HTMLAttributesDict = dict[str, str | None]
+
+SVG_TAG_FIX = {
+    "altglyph": "altGlyph",
+    "altglyphdef": "altGlyphDef",
+    "altglyphitem": "altGlyphItem",
+    "animatecolor": "animateColor",
+    "animatemotion": "animateMotion",
+    "animatetransform": "animateTransform",
+    "clippath": "clipPath",
+    "feblend": "feBlend",
+    "fecolormatrix": "feColorMatrix",
+    "fecomponenttransfer": "feComponentTransfer",
+    "fecomposite": "feComposite",
+    "feconvolvematrix": "feConvolveMatrix",
+    "fediffuselighting": "feDiffuseLighting",
+    "fedisplacementmap": "feDisplacementMap",
+    "fedistantlight": "feDistantLight",
+    "fedropshadow": "feDropShadow",
+    "feflood": "feFlood",
+    "fefunca": "feFuncA",
+    "fefuncb": "feFuncB",
+    "fefuncg": "feFuncG",
+    "fefuncr": "feFuncR",
+    "fegaussianblur": "feGaussianBlur",
+    "feimage": "feImage",
+    "femerge": "feMerge",
+    "femergenode": "feMergeNode",
+    "femorphology": "feMorphology",
+    "feoffset": "feOffset",
+    "fepointlight": "fePointLight",
+    "fespecularlighting": "feSpecularLighting",
+    "fespotlight": "feSpotLight",
+    "fetile": "feTile",
+    "feturbulence": "feTurbulence",
+    "foreignobject": "foreignObject",
+    "glyphref": "glyphRef",
+    "lineargradient": "linearGradient",
+    "radialgradient": "radialGradient",
+    "textpath": "textPath",
+}
+
+SVG_CASE_FIX = {
+    "attributename": "attributeName",
+    "attributetype": "attributeType",
+    "basefrequency": "baseFrequency",
+    "baseprofile": "baseProfile",
+    "calcmode": "calcMode",
+    "clippathunits": "clipPathUnits",
+    "diffuseconstant": "diffuseConstant",
+    "edgemode": "edgeMode",
+    "filterunits": "filterUnits",
+    "glyphref": "glyphRef",
+    "gradienttransform": "gradientTransform",
+    "gradientunits": "gradientUnits",
+    "kernelmatrix": "kernelMatrix",
+    "kernelunitlength": "kernelUnitLength",
+    "keypoints": "keyPoints",
+    "keysplines": "keySplines",
+    "keytimes": "keyTimes",
+    "lengthadjust": "lengthAdjust",
+    "limitingconeangle": "limitingConeAngle",
+    "markerheight": "markerHeight",
+    "markerunits": "markerUnits",
+    "markerwidth": "markerWidth",
+    "maskcontentunits": "maskContentUnits",
+    "maskunits": "maskUnits",
+    "numoctaves": "numOctaves",
+    "pathlength": "pathLength",
+    "patterncontentunits": "patternContentUnits",
+    "patterntransform": "patternTransform",
+    "patternunits": "patternUnits",
+    "pointsatx": "pointsAtX",
+    "pointsaty": "pointsAtY",
+    "pointsatz": "pointsAtZ",
+    "preservealpha": "preserveAlpha",
+    "preserveaspectratio": "preserveAspectRatio",
+    "primitiveunits": "primitiveUnits",
+    "refx": "refX",
+    "refy": "refY",
+    "repeatcount": "repeatCount",
+    "repeatdur": "repeatDur",
+    "requiredextensions": "requiredExtensions",
+    "requiredfeatures": "requiredFeatures",
+    "specularconstant": "specularConstant",
+    "specularexponent": "specularExponent",
+    "spreadmethod": "spreadMethod",
+    "startoffset": "startOffset",
+    "stddeviation": "stdDeviation",
+    "stitchtiles": "stitchTiles",
+    "surfacescale": "surfaceScale",
+    "systemlanguage": "systemLanguage",
+    "tablevalues": "tableValues",
+    "targetx": "targetX",
+    "targety": "targetY",
+    "textlength": "textLength",
+    "viewbox": "viewBox",
+    "viewtarget": "viewTarget",
+    "xchannelselector": "xChannelSelector",
+    "ychannelselector": "yChannelSelector",
+    "zoomandpan": "zoomAndPan",
+}
 
 
 @dataclass(slots=True)
@@ -368,13 +469,18 @@ class TemplateParser(HTMLParser):
         self.feed_str(template.strings[-1])
 
     @staticmethod
-    def parse(t: Template) -> TNode:
+    def parse(t: Template, *, svg_context: bool = False) -> TNode:
         """
         Parse a Template containing valid HTML and substitutions and return
         a TNode tree representing its structure. This cachable structure can later
         be resolved against actual interpolation values to produce a Node tree.
+
+        Pass ``svg_context=True`` for SVG fragments that have no ``<svg>``
+        wrapper, so that tag and attribute case-fixing applies from the root.
         """
         parser = TemplateParser()
+        if svg_context:
+            parser._svg_depth = 1
         parser.feed_template(t)
         parser.close()
         return parser.get_tnode()

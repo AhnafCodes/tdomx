@@ -45,7 +45,7 @@ class HasHTMLDunder(t.Protocol):
 
 @lru_cache(maxsize=0 if "pytest" in sys.modules else 512)
 def _parse_and_cache(cachable: CachableTemplate) -> TNode:
-    return TemplateParser.parse(cachable.template)
+    return TemplateParser.parse(cachable.template, svg_context=cachable.svg_context)
 
 
 type Attribute = tuple[str, object]
@@ -602,5 +602,20 @@ def _resolve_t_node(t_node: TNode, interpolations: tuple[Interpolation, ...]) ->
 def html(template: Template) -> Node:
     """Parse an HTML t-string, substitute values, and return a tree of Nodes."""
     cachable = CachableTemplate(template)
+    t_node = _parse_and_cache(cachable)
+    return _resolve_t_node(t_node, template.interpolations)
+
+
+def svg(template: Template) -> Node:
+    """Parse a standalone SVG fragment and return a tree of Nodes.
+
+    Use when the template does not contain an ``<svg>`` wrapper element.
+    Tag and attribute case-fixing (e.g. ``clipPath``, ``viewBox``) are applied
+    from the root, exactly as they would be inside ``html(t"<svg>...</svg>")``.
+
+    When the template does contain ``<svg>``, use ``html()`` — the SVG context
+    is detected automatically.
+    """
+    cachable = CachableTemplate(template, svg_context=True)
     t_node = _parse_and_cache(cachable)
     return _resolve_t_node(t_node, template.interpolations)

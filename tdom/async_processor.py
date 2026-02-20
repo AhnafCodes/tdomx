@@ -207,3 +207,14 @@ async def html_async(template: Template) -> Node:
     cachable = CachableTemplate(template)
     t_node = _parse_and_cache(cachable)
     return await _resolve_t_node(t_node, template.interpolations)
+
+
+async def svg_async(template: Template) -> Node:
+    """Parse a standalone SVG fragment and return a tree of Nodes (async).
+
+    Async counterpart of ``svg()``. Use when the template does not contain
+    an ``<svg>`` wrapper element.
+    """
+    cachable = CachableTemplate(template, svg_context=True)
+    t_node = _parse_and_cache(cachable)
+    return await _resolve_t_node(t_node, template.interpolations)
