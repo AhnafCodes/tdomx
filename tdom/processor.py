@@ -45,7 +45,7 @@ class HasHTMLDunder(t.Protocol):
 
 @lru_cache(maxsize=0 if "pytest" in sys.modules else 512)
 def _parse_and_cache(cachable: CachableTemplate) -> TNode:
-    return TemplateParser.parse(cachable.template)
+    return TemplateParser.parse(cachable.template, svg_context=cachable.svg_context)
 
 
 type Attribute = tuple[str, object]
@@ -470,6 +470,7 @@ def _invoke_component(
     and passed as keyword arguments if the callable accepts them (or has
     **kwargs). Attributes that don't match parameters are silently ignored.
     """
+    component_name = interpolation.expression or "unknown component"
     value = format_interpolation(interpolation)
     if not callable(value):
         raise TypeError(
@@ -478,9 +479,11 @@ def _invoke_component(
     callable_info = get_callable_info(value)
 
     if callable_info.requires_positional:
-        raise TypeError(
+        err = TypeError(
             "Component callables cannot have required positional arguments."
         )
+        err.add_note(f"While invoking component: {component_name}")
+        raise err
 
     kwargs: AttributesDict = {}
 
@@ -497,11 +500,17 @@ def _invoke_component(
     # Check to make sure we've fully satisfied the callable's requirements
     missing = callable_info.required_named_params - kwargs.keys()
     if missing:
-        raise TypeError(
+        err = TypeError(
             f"Missing required parameters for component: {', '.join(missing)}"
         )
+        err.add_note(f"While invoking component: {component_name}")
+        raise err
 
-    result = value(**kwargs)
+    try:
+        result = value(**kwargs)
+    except TypeError as e:
+        e.add_note(f"While invoking component: {component_name}")
+        raise
     return _node_from_value(result)
 
 
@@ -591,7 +600,22 @@ def _resolve_t_node(t_node: TNode, interpolations: tuple[Interpolation, ...]) ->
 
 
 def html(template: Template) -> Node:
-    """Parse an HTML t-string, substitue values, and return a tree of Nodes."""
+    """Parse an HTML t-string, substitute values, and return a tree of Nodes."""
     cachable = CachableTemplate(template)
+    t_node = _parse_and_cache(cachable)
+    return _resolve_t_node(t_node, template.interpolations)
+
+
+def svg(template: Template) -> Node:
+    """Parse a standalone SVG fragment and return a tree of Nodes.
+
+    Use when the template does not contain an ``<svg>`` wrapper element.
+    Tag and attribute case-fixing (e.g. ``clipPath``, ``viewBox``) are applied
+    from the root, exactly as they would be inside ``html(t"<svg>...</svg>")``.
+
+    When the template does contain ``<svg>``, use ``html()`` — the SVG context
+    is detected automatically.
+    """
+    cachable = CachableTemplate(template, svg_context=True)
     t_node = _parse_and_cache(cachable)
     return _resolve_t_node(t_node, template.interpolations)
