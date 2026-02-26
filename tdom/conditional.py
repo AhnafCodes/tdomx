@@ -25,9 +25,8 @@ def _to_markup(result: object) -> Markup:
             return escape(str(result))
 
 
-class When:
-    """Fluent conditional builder composable into tdom t-string interpolations.
-
+class Conditions:
+    """
     Evaluates cases in order and resolves the value paired with the first
     truthy condition.  Values may be plain objects (evaluated eagerly) or
     zero-argument callables (evaluated lazily at resolution time).
@@ -35,16 +34,16 @@ class When:
     Usage::
 
         html(t"<div>{
-            When()
+            Conditions()
             .when(user.is_admin,   html(t'<badge class="admin">ADMIN</badge>'))
-            .when(user.is_premium, html(t'<badge class="vip">VIP</badge>'))
+            .when(user.is_premium, html(t'<badge class="prp">PRO</badge>'))
             .default(              html(t'<badge>FREE</badge>'))
         }</div>")
 
     Lazy (deferred) form::
 
         html(t"<div>{
-            When()
+            Conditions()
             .when(user.is_admin,   lambda: expensive_admin_component(user))
             .when(user.is_premium, lambda: db_query_component(user))
             .default(              lambda: fallback_component())

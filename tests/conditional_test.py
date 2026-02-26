@@ -2,37 +2,37 @@ from markupsafe import Markup
 
 import pytest
 
-from tdom import When, cond, html
+from tdom import Conditions, cond, html
 from tdom.nodes import Fragment, Text
 
 
 # ---------------------------------------------------------------------------
-# When — basic matching
+# Conditions — basic matching
 # ---------------------------------------------------------------------------
 
 
 def test_when_first_truthy_wins():
-    result = When().when(True, "a").when(True, "b").default("c").__html__()
+    result = Conditions().when(True, "a").when(True, "b").default("c").__html__()
     assert result == Markup("a")
 
 
 def test_when_skips_falsy():
-    result = When().when(False, "a").when(True, "b").default("c").__html__()
+    result = Conditions().when(False, "a").when(True, "b").default("c").__html__()
     assert result == Markup("b")
 
 
 def test_when_uses_default_when_no_match():
-    result = When().when(False, "a").when(False, "b").default("default").__html__()
+    result = Conditions().when(False, "a").when(False, "b").default("default").__html__()
     assert result == Markup("default")
 
 
 def test_when_empty_when_no_match_and_no_default():
-    result = When().when(False, "a").__html__()
+    result = Conditions().when(False, "a").__html__()
     assert result == Markup("")
 
 
 def test_when_no_cases_no_default():
-    result = When().__html__()
+    result = Conditions().__html__()
     assert result == Markup("")
 
 
@@ -48,7 +48,7 @@ def test_when_lazy_value_called_on_match():
         called.append(True)
         return "lazy"
 
-    When().when(True, factory).__html__()
+    Conditions().when(True, factory).__html__()
     assert called == [True]
 
 
@@ -59,7 +59,7 @@ def test_when_lazy_value_not_called_when_not_matched():
         called.append(True)
         return "lazy"
 
-    When().when(False, factory).default("other").__html__()
+    Conditions().when(False, factory).default("other").__html__()
     assert called == []
 
 
@@ -70,7 +70,7 @@ def test_when_lazy_default_called_when_no_match():
         called.append(True)
         return "default"
 
-    When().when(False, "a").default(factory).__html__()
+    Conditions().when(False, "a").default(factory).__html__()
     assert called == [True]
 
 
@@ -81,7 +81,7 @@ def test_when_lazy_default_not_called_when_matched():
         called.append(True)
         return "default"
 
-    When().when(True, "a").default(factory).__html__()
+    Conditions().when(True, "a").default(factory).__html__()
     assert called == []
 
 
@@ -91,24 +91,24 @@ def test_when_lazy_default_not_called_when_matched():
 
 
 def test_when_wraps_plain_string_with_escape():
-    result = When().when(True, "<b>bold</b>").__html__()
+    result = Conditions().when(True, "<b>bold</b>").__html__()
     assert result == Markup("&lt;b&gt;bold&lt;/b&gt;")
 
 
 def test_when_passes_through_markup():
     markup = Markup("<b>safe</b>")
-    result = When().when(True, markup).__html__()
+    result = Conditions().when(True, markup).__html__()
     assert result == Markup("<b>safe</b>")
 
 
 def test_when_uses_html_dunder_on_value():
     node = html(t"<span>hi</span>")
-    result = When().when(True, node).__html__()
+    result = Conditions().when(True, node).__html__()
     assert result == Markup("<span>hi</span>")
 
 
 def test_when_default_plain_string_escaped():
-    result = When().when(False, "ok").default("<xss>").__html__()
+    result = Conditions().when(False, "ok").default("<xss>").__html__()
     assert result == Markup("&lt;xss&gt;")
 
 
@@ -119,18 +119,18 @@ def test_when_default_plain_string_escaped():
 
 def test_when_composable_in_tstring():
     is_admin = True
-    node = html(t"<div>{When().when(is_admin, html(t'<span>ADMIN</span>')).default(html(t'<span>USER</span>'))}</div>")
+    node = html(t"<div>{Conditions().when(is_admin, html(t'<span>ADMIN</span>')).default(html(t'<span>USER</span>'))}</div>")
     assert str(node) == "<div><span>ADMIN</span></div>"
 
 
 def test_when_default_branch_in_tstring():
     is_admin = False
-    node = html(t"<div>{When().when(is_admin, html(t'<span>ADMIN</span>')).default(html(t'<span>USER</span>'))}</div>")
+    node = html(t"<div>{Conditions().when(is_admin, html(t'<span>ADMIN</span>')).default(html(t'<span>USER</span>'))}</div>")
     assert str(node) == "<div><span>USER</span></div>"
 
 
 def test_when_no_match_renders_empty_in_tstring():
-    node = html(t"<div>{When().when(False, html(t'<span>x</span>'))}</div>")
+    node = html(t"<div>{Conditions().when(False, html(t'<span>x</span>'))}</div>")
     assert str(node) == "<div></div>"
 
 
@@ -139,16 +139,16 @@ def test_when_multi_branch_in_tstring():
         return str(
             html(
                 t"<div>{
-                    When()
+                    Conditions()
                     .when(is_admin,   html(t'<span class="admin">ADMIN</span>'))
-                    .when(is_premium, html(t'<span class="vip">VIP</span>'))
+                    .when(is_premium, html(t'<span class="pro">PRO</span>'))
                     .default(         html(t'<span>FREE</span>'))
                 }</div>"
             )
         )
 
     assert badge(True, False) == '<div><span class="admin">ADMIN</span></div>'
-    assert badge(False, True) == '<div><span class="vip">VIP</span></div>'
+    assert badge(False, True) == '<div><span class="pro">PRO</span></div>'
     assert badge(False, False) == "<div><span>FREE</span></div>"
 
 
@@ -156,7 +156,7 @@ def test_when_lazy_in_tstring():
     is_admin = True
     node = html(
         t"<div>{
-            When()
+            Conditions()
             .when(is_admin, lambda: html(t'<span>ADMIN</span>'))
             .default(lambda: html(t'<span>FREE</span>'))
         }</div>"
@@ -273,14 +273,14 @@ def test_cond_multi_branch():
             html(
                 t"<div>{cond(
                     (is_admin,   html(t'<span class="admin">ADMIN</span>')),
-                    (is_premium, html(t'<span class="vip">VIP</span>')),
+                    (is_premium, html(t'<span class="pro">PRO</span>')),
                     default=     html(t'<span>FREE</span>'),
                 )}</div>"
             )
         )
 
     assert badge(True, False) == '<div><span class="admin">ADMIN</span></div>'
-    assert badge(False, True) == '<div><span class="vip">VIP</span></div>'
+    assert badge(False, True) == '<div><span class="pro">PRO</span></div>'
     assert badge(False, False) == "<div><span>FREE</span></div>"
 
 
@@ -292,7 +292,7 @@ def test_cond_multi_branch():
 def test_when_explicit_none_default_renders_empty():
     # Passing None explicitly as the default value should render empty,
     # not be confused with "no default provided".
-    result = When().when(False, "a").default(None).__html__()
+    result = Conditions().when(False, "a").default(None).__html__()
     assert result == Markup("")
 
 

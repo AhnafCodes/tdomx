@@ -417,12 +417,12 @@ def _node_from_value(value: object) -> Node:
         # Consider: falsey values, not just False and None?
         case False | None:
             return Fragment(children=[])
-        case Iterable():
-            children = [_node_from_value(v) for v in value]
-            return Fragment(children=children)
         case HasHTMLDunder():
             # CONSIDER: should we do this lazily?
             return Text(Markup(value.__html__()))
+        case Iterable():
+            children = [_node_from_value(v) for v in value]
+            return Fragment(children=children)
         case c if callable(c):
             # Treat all callable values in child content positions as if
             # they are zero-arg functions that return a value to be rendered.
